@@ -2,6 +2,7 @@ import serial
 import sys
 from enum import Enum
 import time
+import threading
 
 # Respond with SOH(0x01), len (LSB), len(MSB)
 def send_header(ser, length):
@@ -56,6 +57,11 @@ class LoaderState(Enum):
     FIRMWARE_WAIT_CHK = 3
     FIRMWARE_CHK_GOOD = 4
 
+def stdin_handler(ser):
+    while True:
+        i = sys.stdin.readline().strip()
+        ser.write(i.encode("utf-8"))
+
 def main():
     if len(sys.argv) != 3:
         print("usage: main.py <FILENAME> <SERIAL_PORT>")
@@ -99,8 +105,14 @@ def main():
                 print("success");
                 break
         print("will read forever from uart now")
+        t = threading.Thread(target=stdin_handler, daemon=True, args=(ser,))
+        t.start()
         while True:
-            print(ser.read().decode("utf-8"), end="")
+            r = ser.read().decode("utf-8")
+            if r == "\r":
+                continue
+            if len(r) != 0:
+                print(r, end="")
 
 
 if __name__=="__main__":
