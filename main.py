@@ -3,6 +3,8 @@ import sys
 from enum import Enum
 import time
 import threading
+import termios
+import tty
 
 # Respond with SOH(0x01), len (LSB), len(MSB)
 def send_header(ser, length):
@@ -57,10 +59,23 @@ class LoaderState(Enum):
     FIRMWARE_WAIT_CHK = 3
     FIRMWARE_CHK_GOOD = 4
 
-def stdin_handler(ser):
-    while True:
-        i = sys.stdin.readline().strip()
-        ser.write(i.encode("utf-8"))
+def stdin_handler(ser, done):
+    print("Exit with 'q'")
+    fd = sys.stdin.fileno()
+    tattr = termios.tcgetattr(fd)
+    tty.setcbreak(fd, termios.TCSANOW)
+    try:
+        while True:
+            i = sys.stdin.buffer.read(1)
+            if i == b'q':
+                break
+            if i == b'\n':
+                continue
+            ser.write(i)
+    finally:
+        print("Done, restoring terminal")
+        termios.tcsetattr(fd, termios.TCSANOW, tattr)
+        done.set()
 
 def main():
     if len(sys.argv) != 3:
@@ -105,14 +120,18 @@ def main():
                 print("success");
                 break
         print("will read forever from uart now")
-        t = threading.Thread(target=stdin_handler, daemon=True, args=(ser,))
+        done = threading.Event()
+        t = threading.Thread(target=stdin_handler, daemon=True, args=(ser,done))
         t.start()
         while True:
             r = ser.read().decode("utf-8")
+            if len(r) == 0:
+                if done.is_set():
+                    break
+                continue
             if r == "\r":
                 continue
-            if len(r) != 0:
-                print(r, end="")
+            print(r, end="")
 
 
 if __name__=="__main__":
