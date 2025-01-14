@@ -141,6 +141,7 @@ def main():
                             print(f"wrote to serial device ({bytes_written})")
                         else:
                             print("Error: Nothing to respond with...")
+                        print("done")
                         response = None
                         sel.modify(ser, selectors.EVENT_READ)
                     if mask & selectors.EVENT_READ:
@@ -153,10 +154,9 @@ def main():
 
                         request += r
                         if len(request) != 64:
-                            print(f"serial read {len(request)} bytes, need more")
                             continue
                         print(f"request ({len(request)}) {str(request)}")
-                        sel.register(s, selectors.EVENT_WRITE)
+                        sel.modify(s, selectors.EVENT_WRITE)
                 if key.fileobj is s:
                     if mask & selectors.EVENT_WRITE:
                         print("socket ready to write")
