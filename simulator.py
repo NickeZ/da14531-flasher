@@ -126,7 +126,7 @@ def main():
 
     request = b""
     keep_going = True
-    response = None
+    responses = []
     while keep_going:
         try:
             events = sel.select()
@@ -134,15 +134,14 @@ def main():
                 if key.fileobj is ser:
                     if mask & selectors.EVENT_WRITE:
                         print(f"UART: ready to write")
-                        if response is not None:
-                            #response = bytes(range(64))
+                        if not responses:
+                            print("UART: Error: Nothing to respond with...")
+                        for response in responses:
                             print(f"UART: writing ({response.hex()})")
                             bytes_written = ser.write(response)
                             print(f"UART: wrote ({bytes_written})")
-                        else:
-                            print("UART: Error: Nothing to respond with...")
-                        response = None
                         # After a packet is forwarded, listen again
+                        responses = []
                         sel.modify(ser, selectors.EVENT_READ)
                     if mask & selectors.EVENT_READ:
                         print(f"UART: ready to read")
@@ -181,6 +180,7 @@ def main():
                         if len(response) != 64:
                             print("BUG: need to handle partial packets...")
                         print(f"TCP: read ({len(response)}) {response.hex()}")
+                        responses.append(response)
                         # We have read a full 64 byte packet from the socket
                         # register the intent to write it to the serial device
                         sel.modify(ser, selectors.EVENT_WRITE)
